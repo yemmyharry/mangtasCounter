@@ -1,19 +1,26 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"regexp"
 	"sort"
 )
 
 type sorter struct {
 	val int
-	str string
+	key string
 }
 
-func counter() []sorter {
+type book struct {
+	Content string	`json:"content"`
+}
+
+func counter(text string) []sorter {
 	var s []sorter
-	text := "For those who believe in God, most of the big questions are answered. But for those of us who can't readily accept the God formula, the big answers don't remain stone-written. We adjust to new conditions and discoveries. We are pliable. Love need not be a command nor faith a dictum. I am my own god. We are here to unlearn the teachings of the church, state, and our educational system. We are here to drink beer. We are here to kill war. We are here to laugh at the odds and live our lives so well that Death will tremble to take us."
 	arrayText := regexp.MustCompile("[^0-9a-zA-Z]+").Split(text, -1)
 
 	m := map[string]int{}
@@ -26,14 +33,40 @@ func counter() []sorter {
 	sort.Slice(s, func(i, j int) bool {
 		return s[i].val > s[j].val
 	})
-
-	return s[:10]
+	total := len(s)
+	if total > 10 {
+		total = 10
+	}
+	fmt.Println()
+	return s[:total]
 }
+
+func performPostJsonRequest(w http.ResponseWriter, r *http.Request) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Println(err)
+	}
+	b := book{}
+	json.Unmarshal(body, &b)
+
+	res := counter(b.Content)
+	var resultString = ""
+	for _, v := range res {
+		resultString += fmt.Sprintf("%s: %d\n", v.key, v.val)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(resultString))
+
+}
+
 
 func main() {
 
-	for i, s := range counter() {
-		log.Println(i, s.str, s.val)
+	http.HandleFunc("/hello", performPostJsonRequest)
+
+	fmt.Printf("Starting server at port 8080\n")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		log.Fatal(err)
 	}
 
 }
